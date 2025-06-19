@@ -33,11 +33,26 @@ namespace ProductService.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<Product>> Post(Product product)
+        public async Task<ActionResult<Product>> Post([FromBody] ProductCreateRequest request)
         {
+            var product = new Product
+            {
+                Name = request.Name,
+                Price = request.Price,
+                InStock = request.InStock
+            };
+
             _context.Products.Add(product);
             await _context.SaveChangesAsync();
+
             return CreatedAtAction(nameof(Get), new { id = product.Id }, product);
+        }
+
+        public class ProductCreateRequest
+        {
+            public string Name { get; set; } = string.Empty;
+            public double Price { get; set; }
+            public bool InStock { get; set; }
         }
     }
 } 
