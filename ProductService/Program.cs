@@ -1,5 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using ProductService.Models;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using System.Text.Json;
+using ProductService.Health;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,9 +13,15 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddControllers();
 
+// Add health checks
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<ProductDbContext>()
+    .AddCheck<CustomHealthCheck>("Custom_Application_Check");
+
 // Add EF Core SQL Server
+var connectionString = builder.Configuration.GetConnectionString("ProductDb");
 builder.Services.AddDbContext<ProductDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("ProductDb")));
+    options.UseSqlServer(connectionString));
 
 var app = builder.Build();
 
@@ -27,6 +37,27 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Add health check endpoint
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var response = new
+        {
+            Status = report.Status.ToString(),
+            Checks = report.Entries.Select(e => new
+            {
+                Component = e.Key,
+                Status = e.Value.Status.ToString(),
+                Description = e.Value.Description
+            }),
+            TotalDuration = report.TotalDuration
+        };
+        await context.Response.WriteAsJsonAsync(response);
+    }
+});
 
 var summaries = new[]
 {
